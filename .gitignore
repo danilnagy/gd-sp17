@@ -1,3 +1,7 @@
 _*
+*.pyc
+*.3dmbak
+*.rhl
 meta.file
 inputs.txt
+outputs.txt

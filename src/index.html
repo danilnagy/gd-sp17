@@ -4,6 +4,7 @@
         <meta charset="utf-8">
         <title>Design Space Explorer</title>
         <script src="./lib/d3.v3.js"></script>
+        <script src="./lib/kung.js"></script>
         <style>
 
 div {
@@ -164,7 +165,7 @@ div.tooltip{
                     </div>
                 </div>
                 <div class="text-col">
-                    <div class="title">Selected options</div>
+                    <div class="title">Selected designs</div>
                     <div class="chosen" id="list-chosen">
                     </div>
                 </div>
@@ -181,7 +182,7 @@ div.tooltip{
                 </p></div>
             </div>
             <div class="col-chart", id="chart"><p class="button">
-                <button id="button-isolateOptimal" type="button" disabled>Isolate optimal designs</button>
+                <button id="button-isolateOptimal" type="button">Isolate optimal designs</button>
                 <button id="button-isolateSelected" type="button">Isolate selected designs</button>
                 <button id="button-resetZoom" type="button">Reset zoom</button>
             </p></div>
@@ -222,6 +223,7 @@ var colorScale = d3.scale.linear()
 
 var selected = [];
 var boolIsolateSelected = false;
+var boolIsolateOptimal = false;
 
 //TOOLTIP
 var tooltip = d3.select(".tooltip");
@@ -229,27 +231,37 @@ var tooltip_title = tooltip.append("p").attr("id", "tooltip_title");
 
 targetWidth = 200;
 
+//timeout if no screenshot images found
+// setTimeout(function() {
+    // runAll(false);
+// }, 2000);
+
 //load example image to get tooltip size, wait until load to run rest of code
 var imgUrl = './images/0.png';
 var img = new Image();
 img.onload = function () {
-    runAll();
+    runAll(true);
+}
+img.onerror = function(){
+    runAll(false);
 }
 img.src = imgUrl;
 
-function runAll() {
+function runAll(imageTooltip) {
 
     img_width = targetWidth;
     img_height = img.height / (img.width / targetWidth);
 
-    var tooltip_image = tooltip.append("svg")
-        .attr("width", img_width)
-        .attr("height", img_height)
-        .append("svg:image")
-        .attr('x',0)
-        .attr('y',0)
-        .attr('width', img_width)
-        .attr('height', img_height);
+    if (imageTooltip){
+        var tooltip_image = tooltip.append("svg")
+            .attr("width", img_width)
+            .attr("height", img_height)
+            .append("svg:image")
+            .attr('x',0)
+            .attr('y',0)
+            .attr('width', img_width)
+            .attr('height', img_height);
+    }
 
     // Get the data
     d3.csv("./results.csv", function(error, data) {
@@ -265,12 +277,41 @@ function runAll() {
             return bool;
         });
 
-        var headerNames = d3.keys(data[0]);
+        var myKeys = Object.keys(data[0]);
+        var matchingKeys = myKeys.filter(function(key){ return key.indexOf("min_") !== -1 || key.indexOf("max_") !== -1 }).concat(["id"]);
 
-        var xCat = headerNames[5],
-            yCat = headerNames[6];
-            rCat = headerNames[4];
-            colorCat = headerNames[0];
+        console.log(matchingKeys);
+
+        var newData = data.map(function(obj) {
+            newObj = {};
+            matchingKeys.map(function(key) {
+                newObj[key] = obj[key]
+            })
+            return newObj;
+        });
+
+        dominant = getDominantSet(newData);
+
+        var ids = []
+        dominant.map(function(obj) {
+            ids.push(obj["id"]);
+        });
+
+        var headerNames = d3.keys(data[0]);
+        console.log(headerNames);
+
+        data.map(function(obj){
+            if (ids.indexOf(obj["id"]) > -1){
+                obj["dominant"] = true;
+            }else{
+                obj["dominant"] = false;
+            }
+        })
+
+        var xCat = headerNames[headerNames.length-2],
+            yCat = headerNames[headerNames.length-1];
+            rCat = headerNames[0];
+            colorCat = headerNames[1];
 
         opt_xaxis = d3.select("#list-xaxis").selectAll("p")
             .data(headerNames)
@@ -434,13 +475,19 @@ function runAll() {
 
                 if (!boolIsolateSelected || selected.indexOf(d["id"]) > -1){
 
-                    var url = "./images/" + d["id"] + ".png";
-                    tooltip_image.attr("xlink:href", url);
+                    if (imageTooltip){
+                        var url = "./images/" + d["id"] + ".png";
+                        tooltip_image.attr("xlink:href", url);
+                        offX = img_width + 40;
+                        offY = img_height + 80;
+                    }else{
+                        offX = 135;
+                        offY = 75;
+                    }
 
                     mouseX = d3.event.pageX;
                     mouseY = d3.event.pageY;
 
-                    offX = img_width + 40;
                     tooltip.style("left", function(){
                         if (mouseX < offX){
                             return xAxisScale(d[xCat]) + margin.left + 20 + "px";
@@ -450,7 +497,6 @@ function runAll() {
                         
                     });
 
-                    offY = img_height + 80;
                     tooltip.style("top", function(){
                         if (mouseY < offY){
                             return yAxisScale(d[yCat]) + margin.top + 20 + "px";
@@ -533,6 +579,9 @@ function runAll() {
         d3.select("#button-isolateSelected").on("click", function() {
             isolateSelected();
         });
+        d3.select("#button-isolateOptimal").on("click", function() {
+            isolateOptimal();
+        });
 
         function resetDim(type){
             if (type == "radius"){
@@ -577,8 +626,15 @@ function runAll() {
             sel.text(function(d) { return d; });
         };
 
+        function isolateOptimal() {
+            boolIsolateOptimal = !boolIsolateOptimal;
+            boolIsolateSelected = false;
+            updateCircleStyle();
+        };
+
         function isolateSelected() {
             boolIsolateSelected = !boolIsolateSelected;
+            boolIsolateOptimal = false;
             updateCircleStyle();
         };
 
@@ -659,8 +715,16 @@ function runAll() {
                         if (indx > -1) {
                             return 0.6;
                         }else{
-                            return 0.05;
+                            return 0.02;
                         };
+                    }else if(boolIsolateOptimal){
+                        if (d["dominant"] || indx > -1) {
+                            return 0.6;
+                        }else{
+                            return 0.02;
+                        };
+                    }else{
+                        return 0.6
                     };
                 })
                 .style("fill", function(d) { 
