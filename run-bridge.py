@@ -21,17 +21,17 @@ jobDescription = {
 		{ "name": "displacement", "type": "min"},
 		{ "name": "material", "type": "min"},
 		# { "name": "stress", "type": "min"},
-		# { "name": "obstruction", "type": "min"}
+		# { "name": "obstruction", "type": "constraint", "goal": ["less than", 1] }
 		],
-	"algo": "random",
+	"algo": "GA",
 	"algoOptions": {
-		"numGenerations": 5,
-		"numPopulation": 5,
-		"mutationRate": 0.05,
-		"saveElites": 1
+		"numGenerations": 25,
+		"numPopulation": 50,
+		"mutationRate": 0.03,
+		"saveElites": 3
 		},
 	"jobOptions": {
-		"screenshots": False
+		"screenshots": True
 		}
 	}
 

@@ -7,7 +7,6 @@ def run(jobDescription):
 	try:
 		jobName, inputsDef, outputsDef, algo, algoOptions, jobOptions = checkJobDescription(jobDescription)
 	except TypeError:
-		print "error loading job description"
 		return
 
 	paths, meta = init(jobName)
