@@ -1,11 +1,11 @@
 import math
 
-def getDominantSet(data, outputsDef):
+def getDominantSet(data, objectiveGoals):
 
 	#single objective ranking
-	if len(outputsDef) == 1:
+	if len(objectiveGoals) == 1:
 		scores = [float(x['scores'][0]) for x in data]
-		if outputsDef[0]["type"] == "min":
+		if objectiveGoals[0] == "min":
 			return [data[scores.index(min(scores))]]
 		else:
 			return [data[scores.index(max(scores))]]
@@ -13,16 +13,16 @@ def getDominantSet(data, outputsDef):
 	#multi objective ranking
 	else:
 		P = sorted(data, key = lambda x: x['scores'][0])
-		return front(P, outputsDef)
+		return front(P, objectiveGoals)
 
-def front(P, outputsDef):
+def front(P, objectiveGoals):
 
 	if (len(P) == 1):
 		return P
 	else:
 		div = int(math.floor(len(P)/2.0))
-		T = front(P[:div], outputsDef)
-		B = front(P[div:], outputsDef)
+		T = front(P[:div], objectiveGoals)
+		B = front(P[div:], objectiveGoals)
 		M = []
 
 		for des1 in B:
@@ -31,7 +31,7 @@ def front(P, outputsDef):
 				dominated = True
 				for k in range(len(des1['scores'])):
 					# if target is not min, fac is -1 (reverse dominance criteria for maximization objective)
-					fac = (outputsDef[k]["type"] == "min") * 2 - 1
+					fac = (objectiveGoals[k] == "min") * 2 - 1
 					if (fac * float(des1['scores'][k])) < (fac * float(des2['scores'][k])):
 						dominated = False
 						break
