@@ -90,7 +90,7 @@ def defaultOption(name, defaultValue):
     print name, "not specified, using default value(s):", defaultValue
     return defaultValue
 
-def checkJobDescription(jobDescription):
+def parseJobDescription(jobDescription):
 
     # substitute defaults for non-specified options
 
@@ -128,12 +128,33 @@ def checkJobDescription(jobDescription):
             print "error: please specify input type(s)"
             return
 
-    # test for output types
+    # test for output types and parse output format
+
+    # newOutputs = []
     for _o in outputsDef:
         try:
-            if _o["type"] not in ["min", "max"]:
+            if _o["type"] not in ["objective", "constraint"]:
                 print "error:", _o["type"], "output type not supported"
                 return
+            else:
+                if _o["type"] == "objective":
+                    if _o["goal"] not in ["min", "max"]:
+                        print "error:", _o["goal"], "is not a supported goal of output type", _o["type"]
+                    # else:
+                        # newOutputs.append(_o)
+                if _o["type"] == "constraint":
+                    goal = _o["goal"].split(" ")
+                    goal_def = " ".join(goal[:-1])
+                    goal_val = goal[-1]
+                    if goal_def not in ["less than", "greater than", "equals"]:
+                        print "error:", goal, "is not a supported goal of output type", _o["type"]
+                        return
+                    try:
+                        float(goal_val)
+                    except ValueError:
+                        print "error:", _o["type"], "goal value must be numerical", 
+                        return
+
         except KeyError:
             print "error: please specify output type(s)"
             return

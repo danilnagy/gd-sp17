@@ -121,6 +121,16 @@ rect {
     cursor: crosshair; 
 }
 
+.cross {
+    fill-opacity: 0;
+    stroke-width: 1px;
+    /*stroke: black;*/
+}
+
+.cross:hover{
+    cursor: crosshair; 
+}
+
 div.tooltip{
     opacity: .8;
     padding: 8px;
@@ -221,6 +231,8 @@ var radiusScale = d3.scale.linear()
 var colorScale = d3.scale.linear()
     .range([240, 0]);
 
+var baseSize = 5;
+
 var selected = [];
 var boolIsolateSelected = false;
 var boolIsolateOptimal = false;
@@ -247,6 +259,14 @@ img.onerror = function(){
 }
 img.src = imgUrl;
 
+function groupBy(arr, property) {
+  return arr.reduce(function(memo, x) {
+    if (!memo[x[property]]) { memo[x[property]] = []; }
+    memo[x[property]].push(x);
+    return memo;
+  }, {});
+}
+
 function runAll(imageTooltip) {
 
     img_width = targetWidth;
@@ -269,7 +289,7 @@ function runAll(imageTooltip) {
         data = data.filter(function(d){
             bool = true;
             for (var key in d) {
-                if (isNaN(d[key])){
+                if (d[key] == ""){
                     bool = false;
                     break;
                 }
@@ -277,28 +297,30 @@ function runAll(imageTooltip) {
             return bool;
         });
 
+        var dataSplit = groupBy(data, 'feasible');
+
         var myKeys = Object.keys(data[0]);
-        var matchingKeys = myKeys.filter(function(key){ return key.indexOf("min_") !== -1 || key.indexOf("max_") !== -1 }).concat(["id"]);
+        var domKeys = myKeys.filter(function(key){ return key.indexOf("[min]") !== -1 || key.indexOf("[max]") !== -1 }).concat(["id"]);
 
-        console.log(matchingKeys);
+        console.log(domKeys);
 
-        var newData = data.map(function(obj) {
+        var domData = data.map(function(obj) {
             newObj = {};
-            matchingKeys.map(function(key) {
+            domKeys.map(function(key) {
                 newObj[key] = obj[key]
             })
             return newObj;
         });
 
-        dominant = getDominantSet(newData);
+        dominant = getDominantSet(domData);
 
         var ids = []
         dominant.map(function(obj) {
             ids.push(obj["id"]);
         });
 
-        var headerNames = d3.keys(data[0]);
-        console.log(headerNames);
+        // var headerNames = d3.keys(data[0]);
+        // console.log(headerNames);
 
         data.map(function(obj){
             if (ids.indexOf(obj["id"]) > -1){
@@ -306,7 +328,9 @@ function runAll(imageTooltip) {
             }else{
                 obj["dominant"] = false;
             }
-        })
+        });
+
+        var headerNames = myKeys.filter(function(key){ return key.indexOf("[in]") !== -1 || key.indexOf("[min]") !== -1 || key.indexOf("[max]") !== -1 || key.indexOf("generation") !== -1 || key.indexOf("id") !== -1 });
 
         var xCat = headerNames[headerNames.length-2],
             yCat = headerNames[headerNames.length-1];
@@ -348,6 +372,7 @@ function runAll(imageTooltip) {
                 rCat = d;
                 updateDims();
                 updateCircleStyle();
+                updateCrossStyle();
             });
 
         opt_color = d3.select("#list-color").selectAll("p")
@@ -361,6 +386,7 @@ function runAll(imageTooltip) {
                 colorCat = d;
                 updateDims();
                 updateCircleStyle();
+                updateCrossStyle();
             });
 
         // Axis Functions
@@ -463,8 +489,62 @@ function runAll(imageTooltip) {
             .attr("x2", xAxisScale(0))
             .attr("y2", height);
 
+        function updateTooltip(d){
+            if (!boolIsolateSelected || selected.indexOf(d["id"]) > -1){
+
+                if (imageTooltip){
+                    var url = "./images/" + d["id"] + ".png";
+                    tooltip_image.attr("xlink:href", url);
+                    offX = img_width + 40;
+                    offY = img_height + 80;
+                }else{
+                    offX = 135;
+                    offY = 75;
+                }
+
+                mouseX = d3.event.pageX;
+                mouseY = d3.event.pageY;
+
+                tooltip.style("left", function(){
+                    if (mouseX < offX){
+                        return xAxisScale(d[xCat]) + margin.left + 20 + "px";
+                    }else{
+                        return xAxisScale(d[xCat]) + margin.left + 20 - offX + "px";
+                    }
+                    
+                });
+
+                tooltip.style("top", function(){
+                    if (mouseY < offY){
+                        return yAxisScale(d[yCat]) + margin.top + 20 + "px";
+                    }else{
+                        return yAxisScale(d[yCat]) + margin.top + 20 - offY + "px";
+                    }
+                    
+                });
+
+                tooltip_title.text("Design #" + d["id"]);
+                tooltip.style("visibility", "visible");
+            };
+        };
+
+        var cross = objects.selectAll("cross")
+            .data(dataSplit.False)
+            .enter().append("rect")
+            .classed("cross", true)
+            .attr("width", baseSize)
+            .attr("height", baseSize)
+            .on("mouseover", function(d){
+                updateTooltip(d);
+            })
+            .on("mouseout", function(){
+                tooltip.style("visibility", "hidden");
+            })
+            .call(zoom)
+            ;
+
         var circle = objects.selectAll("dot")
-            .data(data)
+            .data(dataSplit.True)
             .enter().append("circle")
             .classed("dot", true)
             .attr("r", 2)
@@ -472,43 +552,7 @@ function runAll(imageTooltip) {
                 selectDesign(d["id"]);
             })
             .on("mouseover", function(d){
-
-                if (!boolIsolateSelected || selected.indexOf(d["id"]) > -1){
-
-                    if (imageTooltip){
-                        var url = "./images/" + d["id"] + ".png";
-                        tooltip_image.attr("xlink:href", url);
-                        offX = img_width + 40;
-                        offY = img_height + 80;
-                    }else{
-                        offX = 135;
-                        offY = 75;
-                    }
-
-                    mouseX = d3.event.pageX;
-                    mouseY = d3.event.pageY;
-
-                    tooltip.style("left", function(){
-                        if (mouseX < offX){
-                            return xAxisScale(d[xCat]) + margin.left + 20 + "px";
-                        }else{
-                            return xAxisScale(d[xCat]) + margin.left + 20 - offX + "px";
-                        }
-                        
-                    });
-
-                    tooltip.style("top", function(){
-                        if (mouseY < offY){
-                            return yAxisScale(d[yCat]) + margin.top + 20 + "px";
-                        }else{
-                            return yAxisScale(d[yCat]) + margin.top + 20 - offY + "px";
-                        }
-                        
-                    });
-
-                    tooltip_title.text("Design #" + d["id"]);
-                    tooltip.style("visibility", "visible");
-                };
+                updateTooltip(d);
             })
             .on("mouseout", function(){
                 tooltip.style("visibility", "hidden");
@@ -527,9 +571,14 @@ function runAll(imageTooltip) {
             yLine.attr("x1", xAxisScale(0)).attr("x2", xAxisScale(0));
 
             // Select All Circles
-            d3.select("#scatter").selectAll("circle")
+            d3.select("#scatter").selectAll(".dot")
                 .attr("cx", function(d, i) { return xAxisScale(d[xCat]); })
                 .attr("cy", function(d, i) { return yAxisScale(d[yCat]); })
+
+            // Select All Crosses
+            d3.select("#scatter").selectAll(".cross")
+                .attr("x", function(d, i) { return xAxisScale(d[xCat]) - baseSize/2; })
+                .attr("y", function(d, i) { return yAxisScale(d[yCat]) - baseSize/2; })
         }
 
         // Zoom Function Event Listeners
@@ -591,6 +640,7 @@ function runAll(imageTooltip) {
             };
             updateDims();
             updateCircleStyle();
+            updateCrossStyle();
         };
 
         function selectDesign(id) {
@@ -630,6 +680,7 @@ function runAll(imageTooltip) {
             boolIsolateOptimal = !boolIsolateOptimal;
             boolIsolateSelected = false;
             updateCircleStyle();
+            updateCrossStyle();
         };
 
         function isolateSelected() {
@@ -659,6 +710,8 @@ function runAll(imageTooltip) {
 
             updateCirclePos();
             updateCircleStyle();
+            updateCrossPos();
+            updateCrossStyle();
 
         };
 
@@ -691,7 +744,7 @@ function runAll(imageTooltip) {
         function updateCirclePos(){
           
             // Select All Circles
-            d3.select("#scatter").selectAll("circle")
+            d3.select("#scatter").selectAll(".dot")
                 .transition()
                 .attr("cx", function(d, i) { return xAxisScale(d[xCat]); })
                 .attr("cy", function(d, i) { return yAxisScale(d[yCat]); })
@@ -743,6 +796,33 @@ function runAll(imageTooltip) {
                     };
                 });
 
+        };
+
+        function updateCrossPos(){
+            // Select All Crosses
+            d3.select("#scatter").selectAll(".cross")
+                .transition()
+                .attr("x", function(d, i) { return xAxisScale(d[xCat]) - baseSize/2; })
+                .attr("y", function(d, i) { return yAxisScale(d[yCat]) - baseSize/2; })
+        };
+
+        function updateCrossStyle(){
+            // Select All Crosses
+            d3.select("#scatter").selectAll(".cross")
+                .style("stroke", function(d) { 
+                    if (colorCat === null){
+                        return "darkgrey";
+                    }else{
+                        return d3.hsl(colorScale(d[colorCat]), 1.0, 0.475);
+                    }
+                })
+                .style("opacity", function(d) {
+                    if(boolIsolateOptimal){
+                        return 0.1
+                    }else{
+                        return 1.0
+                    };
+                })
         };
 
     });
