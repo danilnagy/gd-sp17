@@ -20,7 +20,6 @@ function getDominantSet(data){
 	// console.log(keys);
 
 	return front(P, keys);
-	console.log("done");
 }
 
 function front(P, keys){
@@ -41,8 +40,7 @@ function front(P, keys){
 				dominated = true;
 				for (var k = 0; k < keys.length; k++) {
 					// if target is not min, fac is -1 (reverse dominance criteria for maximization objective)
-					fac = keys[k].indexOf("min_") * 2 + 1
-					console.log(fac)
+					fac = keys[k].indexOf("[min]") * 2 + 1
 					if ((fac * parseFloat(B[i][keys[k]])) < (fac * parseFloat(T[j][keys[k]]))){
 						dominated = false;
 						break;

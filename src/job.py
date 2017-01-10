@@ -5,7 +5,7 @@ from util import *
 def run(jobDescription):
 
 	try:
-		jobName, inputsDef, outputsDef, algo, algoOptions, jobOptions = checkJobDescription(jobDescription)
+		jobName, inputsDef, outputsDef, algo, algoOptions, jobOptions = parseJobDescription(jobDescription)
 	except TypeError:
 		return
 
@@ -28,15 +28,22 @@ def run(jobDescription):
 
 def runGA(inputsDef, outputsDef, algoOptions, jobOptions, paths, meta):
 
+	# check if using constraints
+	types = [x["type"] for x in outputsDef]
+	usingConstraints = "constraint" in types
+
 	# create results file header
 	header = []
 	header.append("id")
 	header.append("generation")
 
+	if usingConstraints:
+		header.append("feasible")
+
 	for _i in inputsDef:
-		header.append("in_" + _i["name"])
+		header.append("[in] " + _i["name"])
 	for _o in outputsDef:
-		header.append(_o["type"] + "_" + _o["name"])
+		header.append("[" + _o["goal"] + "] " + _o["name"])
 
 	with open(paths["results"], 'a') as f:
 		f.write(",".join(header))
@@ -71,20 +78,19 @@ def runGA(inputsDef, outputsDef, algoOptions, jobOptions, paths, meta):
 			meta, outputs = computeDesign(des.get_id(), des.get_inputs(), jobOptions, paths, meta)
 			if outputs is None:
 				return "model unresponsive"
-			des.set_outputs(outputs)
+			des.set_outputs(outputs, outputsDef, usingConstraints)
 
 			print des.get_genNum(), "/", des.get_desNum(), ":", outputs
 			
+			# write results file
 			with open(paths["results"], 'a') as f:
-				f.write("\n" + ",".join([str(x) for x in ([des.get_id(),des.get_genNum()] + printFormat(des.get_inputs(), inputsDef) + outputs)]))
+				d = [des.get_id(),des.get_genNum()]
+				if usingConstraints:
+					d.append(des.get_feasibility())
+				f.write("\n" + ",".join([str(x) for x in (d + printFormat(des.get_inputs(), inputsDef) + outputs)]))
 
-		# generate performance set of id and objective values (scores)
-		performance = []
-		for i, des in enumerate(population):
-			performance.append({'id': i, 'scores': des.get_outputs()})
-		
 		# compute ranking for population (higher value is better performance)
-		ranking = rank(performance, outputsDef)
+		ranking = rank(population, outputsDef, g, numGenerations, usingConstraints)
 		print "Generation ranking:", ranking
 
 		# add designs to mating pool based on ranking
@@ -95,16 +101,17 @@ def runGA(inputsDef, outputsDef, algoOptions, jobOptions, paths, meta):
 
 		children = []
 
-		# get elites
-		elites = [i[0] for i in sorted(enumerate(ranking), key=lambda x:x[1])][-saveElites:]
-		print "elite(s):", elites
+		if saveElites > 0:
+			# get elites
+			elites = [i[0] for i in sorted(enumerate(ranking), key=lambda x:x[1])][-saveElites:]
+			print "elite(s):", elites
 
-		# add elites to next generation
-		for i, eliteNum in enumerate(elites):
-			child = Design(g+1, i, idNum)
-			child.set_inputs(population[eliteNum].get_inputs())
-			children.append(child)
-			idNum += 1
+			# add elites to next generation
+			for i, eliteNum in enumerate(elites):
+				child = Design(g+1, i, idNum)
+				child.set_inputs(population[eliteNum].get_inputs())
+				children.append(child)
+				idNum += 1
 
 		for i in range(len(population)-saveElites):				
 			parentA = matingPool[random.choice(range(len(matingPool)))]

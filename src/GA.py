@@ -4,17 +4,15 @@ from kung import getDominantSet
 
 class Design:
     
-    genNum = 0
-    desNum = 0
-    id = 0
-    inputs = []
-    outputs = []
-    rank = 0
-    
     def __init__(self, genNum, desNum, id):
         self.genNum = genNum
         self.desNum = desNum
         self.id = id
+        self.inputs = []
+        self.objectives = []
+        self.feasible = True
+        self.penalty = 0
+        self.rank = 0
 
     def get_id(self):
         return self.id
@@ -31,11 +29,39 @@ class Design:
     def get_inputs(self):
         return self.inputs
 
-    def set_outputs(self, outputs):
-        self.outputs = outputs
+    def set_outputs(self, outputs, outputsDef, usingConstraints):
+        if usingConstraints:
+            for i,_o in enumerate(outputs):
+                if outputsDef[i]["type"] == "objective":
+                    self.objectives.append(_o)
+                elif outputsDef[i]["type"] == "constraint":
+                    goal = outputsDef[i]["goal"].split(" ")
+                    goal_def = " ".join(goal[:-1])
+                    goal_val = float(goal[-1])
 
-    def get_outputs(self):
-        return self.outputs
+                    if goal_def == "less than":
+                        if _o > goal_val:
+                            self.penalty += 1
+                            self.feasible = False
+                    elif goal_def == "greater than":
+                        if _o < goal_val:
+                            self.penalty += 1
+                            self.feasible = False
+                    elif goal_def == "equals":
+                        if _o != goal_val:
+                            self.penalty += 1
+                            self.feasible = False
+        else:
+            self.objectives = outputs
+
+    def get_objectives(self):
+        return self.objectives
+
+    def get_feasibility(self):
+        return self.feasible
+
+    def get_penalty(self):
+        return self.penalty
 
     def update_rank(self, var):
         self.rank = var
@@ -89,25 +115,37 @@ class Design:
                 self.inputs[i] = mutation
 
 
-def rank(performance, outputsDef):
+def rank(population, outputsDef, g, numGenerations, usingConstraints):
+
+    designs = []
+    for i, des in enumerate(population):
+        designs.append({'id': i, 'scores': des.get_objectives()})
+
+    objectiveGoals = [x["goal"] for x in outputsDef if x["type"] == "objective"]
+
+    validSet = [x for x in designs if len(x['scores']) == len(objectiveGoals)]
+
     dom = []
     ranking = []
 
-    Pset = [x for x in performance if len(x['scores']) == len(outputsDef)]
-    P = Pset
+    P = validSet
 
     while len(P) > 0:
-        ranking.append([x['id'] for x in getDominantSet(P, outputsDef)])
+        ranking.append([x['id'] for x in getDominantSet(P, objectiveGoals)])
         dom = dom + ranking[-1]
-        P = [x for x in Pset if x['id'] not in dom]
-
-    rankingOut = [0] * len(performance)
+        P = [x for x in validSet if x['id'] not in dom]
 
     ranking.reverse()
 
+    constraintPenalties = [( ( (numGenerations - g) / float(numGenerations) ) ** x.get_penalty() ) for x in population]
+
+    if usingConstraints:
+        print "Constraint penalties:", constraintPenalties
+
+    rankingOut = [0] * len(designs)
     for i, ids in enumerate(ranking):
         for id in ids:
-            rankingOut[id] = i + 1
+            rankingOut[id] = int(round( (i + 1) * constraintPenalties[id] ) )
 
     return rankingOut
 
