@@ -41,12 +41,15 @@ def runGA(inputsDef, outputsDef, algoOptions, jobOptions, paths, meta):
 		header.append("feasible")
 
 	for _i in inputsDef:
-		header.append("[in] " + _i["name"])
+		if _i["type"] == "sequence":
+			header.append("[in " + str(_i["depth"]) + "] " + _i["name"])
+		else:
+			header.append("[in] " + _i["name"])
 	for _o in outputsDef:
 		header.append("[" + _o["goal"] + "] " + _o["name"])
 
 	with open(paths["results"], 'a') as f:
-		f.write(",".join(header))
+		f.write("\t".join(header))
 
 	# load options
 	numGenerations = algoOptions["numGenerations"]
@@ -87,7 +90,7 @@ def runGA(inputsDef, outputsDef, algoOptions, jobOptions, paths, meta):
 				d = [des.get_id(),des.get_genNum()]
 				if usingConstraints:
 					d.append(des.get_feasibility())
-				f.write("\n" + ",".join([str(x) for x in (d + printFormat(des.get_inputs(), inputsDef) + outputs)]))
+				f.write("\n" + "\t".join([str(x) for x in (d + printFormat(des.get_inputs(), inputsDef) + outputs)]))
 
 		# compute ranking for population (higher value is better performance)
 		ranking = rank(population, outputsDef, g, numGenerations, usingConstraints)

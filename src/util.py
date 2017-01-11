@@ -15,7 +15,7 @@ def getPaths(jobID):
     paths["meta"] = paths["local"] + "meta.file"
 
     paths["job"] = paths["local"] + jobID + "\\"
-    paths["results"] = paths["job"] + "results.csv"
+    paths["results"] = paths["job"] + "results.tsv"
 
     return paths
 
@@ -53,15 +53,19 @@ def cleanup(folder):
 def printFormat(data, inputsDef):
     formatted = []
 
-    for i, d in enumerate(data):
+    # visualization print conversion implemented in client-side js
 
-        if type(d) is list:
-            value = 0
-            for j in range(len(d)):
-                value += d[j] * inputsDef[i]["depth"] ** j
-            formatted.append(value)
-        else:
-            formatted.append(d)
+    # for i, d in enumerate(data):
+
+    #     if type(d) is list:
+    #         value = 0
+    #         for j in range(len(d)):
+    #             value += d[j] * inputsDef[i]["depth"] ** j
+    #         formatted.append(value)
+    #     else:
+    #         formatted.append(d)
+
+    formatted = data
 
     return formatted
 
@@ -147,7 +151,7 @@ def parseJobDescription(jobDescription):
                     goal_def = " ".join(goal[:-1])
                     goal_val = goal[-1]
                     if goal_def not in ["less than", "greater than", "equals"]:
-                        print "error:", goal, "is not a supported goal of output type", _o["type"]
+                        print "error: [", _o["goal"], "] is not a supported goal of output type", _o["type"]
                         return
                     try:
                         float(goal_val)

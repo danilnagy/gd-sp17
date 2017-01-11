@@ -1,15 +1,27 @@
-from job import run
+from src import job
 
-run(jobName = "box",
-	inputs = [
-		["length", [0,10] ], 
-		["width", [0,10] ], 
-		["height", [0,10] ]
+jobDescription = {
+	"jobName": "box",
+	"inputsDef": [
+		{ "name": "length", "type": "continuous", "range": [0,10]},
+		{ "name": "width", "type": "continuous", "range": [0,10]},
+		{ "name": "height", "type": "continuous", "range": [0,10]}
 		],
-	outputs = [
-		["surface area", "min"],
-		["volume",  "max"]
+	"outputsDef": [
+		{ "name": "surface area", "type": "objective", "goal": "min"},
+		{ "name": "volume", "type": "objective", "goal": "max"}
 		],
-	numGenerations = 5,
-	numPopulation = 5,
-	algo = "GA")
+	"algo": "GA",
+	"algoOptions": {
+		"numGenerations": 5,
+		"numPopulation": 5,
+		"mutationRate": 0.05,
+		"saveElites": 0
+		},
+	"jobOptions": {
+		"screenshots": True
+		}
+	}
+
+# job.createInputFile(jobDescription)
+job.run(jobDescription)

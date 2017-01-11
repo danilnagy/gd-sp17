@@ -54,7 +54,7 @@ div {
 }
 
 .chosen {
-    height: 560px ;
+    height: 675px ;
     overflow-y: auto ;
     overflow-x: hidden ;
     border-top-width: 1px ;
@@ -121,13 +121,13 @@ rect {
     cursor: crosshair; 
 }
 
-.cross {
+.box {
     fill-opacity: 0;
     stroke-width: 1px;
     /*stroke: black;*/
 }
 
-.cross:hover{
+.box:hover{
     cursor: crosshair; 
 }
 
@@ -192,6 +192,7 @@ div.tooltip{
                 </p></div>
             </div>
             <div class="col-chart", id="chart"><p class="button">
+                <button id="button-reloadData" type="button" disabled>Reload data</button>
                 <button id="button-isolateOptimal" type="button">Isolate optimal designs</button>
                 <button id="button-isolateSelected" type="button">Isolate selected designs</button>
                 <button id="button-resetZoom" type="button">Reset zoom</button>
@@ -241,7 +242,7 @@ var boolIsolateOptimal = false;
 var tooltip = d3.select(".tooltip");
 var tooltip_title = tooltip.append("p").attr("id", "tooltip_title");
 
-targetWidth = 200;
+targetWidth = 190;
 
 //timeout if no screenshot images found
 // setTimeout(function() {
@@ -267,6 +268,21 @@ function groupBy(arr, property) {
   }, {});
 }
 
+// convert sequences as binary to continuous equivalent for visualization
+function processBinary(str, header) {
+    seq = JSON.parse(str);
+    value = 0
+
+    sub = header.substring(4);
+    depth = Number(sub.substring(0, sub.indexOf(']')));
+    
+    for (var i = 0; i < seq.length; i++) {
+        value += seq[i] * Math.pow(depth, i);
+    }
+
+    return value;
+}
+
 function runAll(imageTooltip) {
 
     img_width = targetWidth;
@@ -284,12 +300,12 @@ function runAll(imageTooltip) {
     }
 
     // Get the data
-    d3.csv("./results.csv", function(error, data) {
+    d3.tsv("./results.tsv", function(error, data) {
 
         data = data.filter(function(d){
             bool = true;
             for (var key in d) {
-                if (d[key] == ""){
+                if (d[key] == "" || d[key] == null){
                     bool = false;
                     break;
                 }
@@ -297,10 +313,31 @@ function runAll(imageTooltip) {
             return bool;
         });
 
-        var dataSplit = groupBy(data, 'feasible');
+        // search for 'sequence' type variables, and if found convert them as binary to continuous equivalent
+        for (var i = 0; i < data.length; i++) {
+            keys = Object.keys(data[i]);
+            for (var j = 0; j < keys.length; j++) {
+                if (data[i][keys[j]].indexOf("[") == 0) {
+                    data[i][keys[j]] = processBinary(data[i][keys[j]], keys[j])
+                }
+            }
+        }
 
         var myKeys = Object.keys(data[0]);
-        var domKeys = myKeys.filter(function(key){ return key.indexOf("[min]") !== -1 || key.indexOf("[max]") !== -1 }).concat(["id"]);
+
+        // check if constraints are being used
+        if (myKeys.indexOf("feasible") !== -1){
+            var dataSplit = groupBy(data, "feasible");
+        }else{
+            var dataSplit = {
+                False: [],
+                True: data
+            };
+        };
+
+        var domKeys = myKeys.filter(function(key){ 
+            return key.indexOf("[min]") !== -1 || key.indexOf("[max]") !== -1 
+        }).concat(["id"]);
 
         console.log(domKeys);
 
@@ -330,7 +367,7 @@ function runAll(imageTooltip) {
             }
         });
 
-        var headerNames = myKeys.filter(function(key){ return key.indexOf("[in]") !== -1 || key.indexOf("[min]") !== -1 || key.indexOf("[max]") !== -1 || key.indexOf("generation") !== -1 || key.indexOf("id") !== -1 });
+        var headerNames = myKeys.filter(function(key){ return key.indexOf("[in") !== -1 || key.indexOf("[min]") !== -1 || key.indexOf("[max]") !== -1 || key.indexOf("generation") !== -1 || key.indexOf("id") !== -1 });
 
         var xCat = headerNames[headerNames.length-2],
             yCat = headerNames[headerNames.length-1];
@@ -372,7 +409,7 @@ function runAll(imageTooltip) {
                 rCat = d;
                 updateDims();
                 updateCircleStyle();
-                updateCrossStyle();
+                updateBoxStyle();
             });
 
         opt_color = d3.select("#list-color").selectAll("p")
@@ -386,7 +423,7 @@ function runAll(imageTooltip) {
                 colorCat = d;
                 updateDims();
                 updateCircleStyle();
-                updateCrossStyle();
+                updateBoxStyle();
             });
 
         // Axis Functions
@@ -528,10 +565,10 @@ function runAll(imageTooltip) {
             };
         };
 
-        var cross = objects.selectAll("cross")
+        var box = objects.selectAll("box")
             .data(dataSplit.False)
             .enter().append("rect")
-            .classed("cross", true)
+            .classed("box", true)
             .attr("width", baseSize)
             .attr("height", baseSize)
             .on("mouseover", function(d){
@@ -575,8 +612,8 @@ function runAll(imageTooltip) {
                 .attr("cx", function(d, i) { return xAxisScale(d[xCat]); })
                 .attr("cy", function(d, i) { return yAxisScale(d[yCat]); })
 
-            // Select All Crosses
-            d3.select("#scatter").selectAll(".cross")
+            // Select All boxes
+            d3.select("#scatter").selectAll(".box")
                 .attr("x", function(d, i) { return xAxisScale(d[xCat]) - baseSize/2; })
                 .attr("y", function(d, i) { return yAxisScale(d[yCat]) - baseSize/2; })
         }
@@ -631,6 +668,9 @@ function runAll(imageTooltip) {
         d3.select("#button-isolateOptimal").on("click", function() {
             isolateOptimal();
         });
+        d3.select("#button-reloadData").on("click", function() {
+            reloadData();
+        });
 
         function resetDim(type){
             if (type == "radius"){
@@ -640,7 +680,7 @@ function runAll(imageTooltip) {
             };
             updateDims();
             updateCircleStyle();
-            updateCrossStyle();
+            updateBoxStyle();
         };
 
         function selectDesign(id) {
@@ -663,30 +703,62 @@ function runAll(imageTooltip) {
         };
 
         function updateSelectedList() {
-            var sel = d3.select("#list-chosen").selectAll("p")
+            var sel = d3.select("#list-chosen").selectAll("div")
                 .data(selected);
 
             sel.exit()
                 .remove();
 
-            sel.enter()
-                .append("p")
-                .attr("class", "option");
+            var newItems = sel.enter().append("div");
 
-            sel.text(function(d) { return d; });
+            newItems
+                .append("svg")
+                .attr('width', img_width)
+                .attr('height', img_height)
+                .append("svg:image")
+                .attr('x',0)
+                .attr('y',0)
+                .attr('width', img_width)
+                .attr('height', img_height)
+                // .attr("xlink:href", function(d){
+                    // return "./images/" + d + ".png";
+                // })
+            ;
+
+            newItems
+                .append("p")
+                .attr("class", "option")
+                // .text(function(d) { return d; })
+            ;
+
+
+            sel.select("image")
+                .attr("xlink:href", function(d){
+                    return "./images/" + d + ".png";
+                })
+            ;
+
+            sel.select("p")
+                .text(function(d) { return "Design #" + d; })
+            ;
         };
 
         function isolateOptimal() {
             boolIsolateOptimal = !boolIsolateOptimal;
             boolIsolateSelected = false;
             updateCircleStyle();
-            updateCrossStyle();
+            updateBoxStyle();
         };
 
         function isolateSelected() {
             boolIsolateSelected = !boolIsolateSelected;
             boolIsolateOptimal = false;
             updateCircleStyle();
+            updateBoxStyle();
+        };
+
+        function reloadData() {
+            console.log("not yet implemented")
         };
 
         function update() {
@@ -710,8 +782,8 @@ function runAll(imageTooltip) {
 
             updateCirclePos();
             updateCircleStyle();
-            updateCrossPos();
-            updateCrossStyle();
+            updateBoxPos();
+            updateBoxStyle();
 
         };
 
@@ -798,17 +870,17 @@ function runAll(imageTooltip) {
 
         };
 
-        function updateCrossPos(){
-            // Select All Crosses
-            d3.select("#scatter").selectAll(".cross")
+        function updateBoxPos(){
+            // Select All Boxes
+            d3.select("#scatter").selectAll(".box")
                 .transition()
                 .attr("x", function(d, i) { return xAxisScale(d[xCat]) - baseSize/2; })
                 .attr("y", function(d, i) { return yAxisScale(d[yCat]) - baseSize/2; })
         };
 
-        function updateCrossStyle(){
-            // Select All Crosses
-            d3.select("#scatter").selectAll(".cross")
+        function updateBoxStyle(){
+            // Select All Boxes
+            d3.select("#scatter").selectAll(".box")
                 .style("stroke", function(d) { 
                     if (colorCat === null){
                         return "darkgrey";
@@ -817,7 +889,7 @@ function runAll(imageTooltip) {
                     }
                 })
                 .style("opacity", function(d) {
-                    if(boolIsolateOptimal){
+                    if(boolIsolateOptimal || boolIsolateSelected){
                         return 0.1
                     }else{
                         return 1.0
