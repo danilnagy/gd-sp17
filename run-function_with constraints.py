@@ -12,8 +12,8 @@ jobDescription = {
 	"outputsDef": [
 		{ "name": "f1", "type": "objective", "goal": "min"},
 		{ "name": "f2", "type": "objective", "goal": "min"},
-		# { "name": "g1", "type": "constraint", "goal": "less than 25" },
-		# { "name": "g2", "type": "constraint", "goal": "greater than 7.7" }
+		{ "name": "g1", "type": "constraint", "goal": "less than 25" },
+		{ "name": "g2", "type": "constraint", "goal": "greater than 7.7" }
 		],
 	"algo": "GA",
 	"algoOptions": {

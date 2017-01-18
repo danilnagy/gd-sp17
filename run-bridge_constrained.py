@@ -1,10 +1,8 @@
 from src import job
 
 jobDescription = {
-	"jobName": "bridge",
+	"jobName": "bridge-constrained",
 	"inputsDef": [
-		# { "name": "curvePoint1", "type": "continuous", "range": [0,10]},
-		# { "name": "curvePoint2", "type": "continuous", "range": [0,10]},
 		{ "name": "height1", "type": "continuous", "range": [0,5]},
 		{ "name": "height2", "type": "continuous", "range": [0,5]},
 		{ "name": "height3", "type": "continuous", "range": [0,5]},
@@ -15,19 +13,21 @@ jobDescription = {
 		{ "name": "type2", "type": "categorical", "num": 4},
 		{ "name": "type3", "type": "categorical", "num": 4},
 		{ "name": "type4", "type": "categorical", "num": 4},
-		{ "name": "type5", "type": "categorical", "num": 4}
+		{ "name": "type5", "type": "categorical", "num": 4},
+		{ "name": "curvePoint1", "type": "continuous", "range": [0,10]},
+		{ "name": "curvePoint2", "type": "continuous", "range": [0,10]},
 		],
 	"outputsDef": [
 		{ "name": "displacement", "type": "objective", "goal": "min"},
 		{ "name": "material", "type": "objective", "goal": "min"},
-		# { "name": "displacement", "type": "constraint", "goal": "less than 0.005" }
+		{ "name": "obstruction", "type": "constraint", "goal": "less than 0.01" }
 		],
 	"algo": "GA",
 	"algoOptions": {
 		"numGenerations": 100,
 		"numPopulation": 100,
 		"mutationRate": 0.05,
-		"saveElites": 5
+		"saveElites": 2
 		},
 	"jobOptions": {
 		"screenshots": True

@@ -2,7 +2,7 @@ import math
 
 def getDominantSet(data, objectiveGoals):
 
-	#single objective ranking
+	# single objective ranking
 	if len(objectiveGoals) == 1:
 		scores = [float(x['scores'][0]) for x in data]
 		if objectiveGoals[0] == "min":
@@ -10,7 +10,7 @@ def getDominantSet(data, objectiveGoals):
 		else:
 			return [data[scores.index(max(scores))]]
 
-	#multi objective ranking
+	# multi-objective ranking
 	else:
 		P = sorted(data, key = lambda x: x['scores'][0])
 		return front(P, objectiveGoals)

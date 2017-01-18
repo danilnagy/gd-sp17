@@ -268,7 +268,7 @@ function groupBy(arr, property) {
   }, {});
 }
 
-// convert sequences as binary to continuous equivalent for visualization
+// convert series as binary to continuous equivalent for visualization
 function processBinary(str, header) {
     seq = JSON.parse(str);
     value = 0
@@ -283,12 +283,40 @@ function processBinary(str, header) {
     return value;
 }
 
+// convert sequences as permutation to continuous equivalent for visualization
+function processPermutation(str, header) {
+    
+    permutation = JSON.parse(str);
+
+    var n = permutation.length;
+
+    var pos = [];
+    var elems = [];
+
+    var k = 0;
+    var m = 1;
+
+    for (var i = 0; i < n; i++) {
+        pos.push(i);
+        elems.push(i);
+    }
+
+    for (var i = 0; i < n-1; i++) {
+        k += m * pos[permutation[i]];
+        m = m * (n-i);
+        pos[elems[n-i-1]] = pos[permutation[i]];
+        elems[pos[permutation[i]]] = elems[n-i-1];
+    }
+
+    return k;
+}
+
 function runAll(imageTooltip) {
 
-    img_width = targetWidth;
-    img_height = img.height / (img.width / targetWidth);
-
     if (imageTooltip){
+        img_width = targetWidth;
+        img_height = img.height / (img.width / targetWidth);
+
         var tooltip_image = tooltip.append("svg")
             .attr("width", img_width)
             .attr("height", img_height)
@@ -297,6 +325,9 @@ function runAll(imageTooltip) {
             .attr('y',0)
             .attr('width', img_width)
             .attr('height', img_height);
+    }else{
+        img_width = targetWidth;
+        img_height = 0;
     }
 
     // Get the data
@@ -313,21 +344,34 @@ function runAll(imageTooltip) {
             return bool;
         });
 
-        // search for 'sequence' type variables, and if found convert them as binary to continuous equivalent
-        for (var i = 0; i < data.length; i++) {
-            keys = Object.keys(data[i]);
-            for (var j = 0; j < keys.length; j++) {
-                if (data[i][keys[j]].indexOf("[") == 0) {
-                    data[i][keys[j]] = processBinary(data[i][keys[j]], keys[j])
+        var allKeys = Object.keys(data[0]);
+
+        console.log(allKeys);
+
+        // search for 'series' or 'sequence' type variables
+        var listKeys = []
+        for (var i = 0; i < allKeys.length; i++) {
+            if (allKeys[i].indexOf("[ser") !== -1 || allKeys[i].indexOf("[seq") !== -1){
+                listKeys.push(allKeys[i]);
+            }
+        }
+
+        // convert to integer equivalent
+        for (var i = 0; i < listKeys.length; i++) {
+            for (var j = 0; j < data.length; j++) {
+                if (listKeys[i].indexOf("[ser") == 0) {
+                    data[j][listKeys[i]] = processBinary(data[j][listKeys[i]], listKeys[i]);
+                }
+                else if (listKeys[i].indexOf("[seq") == 0) {
+                    console.log(data[j][listKeys[i]])
+                    data[j][listKeys[i]] = processPermutation(data[j][listKeys[i]], listKeys[i]);
                 }
             }
         }
 
-        var myKeys = Object.keys(data[0]);
-
         // check if constraints are being used
-        if (myKeys.indexOf("feasible") !== -1){
-            var dataSplit = groupBy(data, "feasible");
+        if (allKeys.indexOf("feasible") !== -1){
+            dataSplit = groupBy(data, "feasible");
         }else{
             var dataSplit = {
                 False: [],
@@ -335,39 +379,43 @@ function runAll(imageTooltip) {
             };
         };
 
-        var domKeys = myKeys.filter(function(key){ 
-            return key.indexOf("[min]") !== -1 || key.indexOf("[max]") !== -1 
-        }).concat(["id"]);
+        if (dataSplit.True !== undefined){
+            var domKeys = allKeys.filter(function(key){ 
+                return key.indexOf("[min]") !== -1 || key.indexOf("[max]") !== -1 
+            }).concat(["id"]);
 
-        console.log(domKeys);
+            var domData = dataSplit.True.map(function(obj) {
+                newObj = {};
+                domKeys.map(function(key) {
+                    newObj[key] = obj[key]
+                })
+                return newObj;
+            });
 
-        var domData = data.map(function(obj) {
-            newObj = {};
-            domKeys.map(function(key) {
-                newObj[key] = obj[key]
-            })
-            return newObj;
-        });
+            dominant = getDominantSet(domData);
 
-        dominant = getDominantSet(domData);
+            var ids = []
+            dominant.map(function(obj) {
+                ids.push(obj["id"]);
+            });
 
-        var ids = []
-        dominant.map(function(obj) {
-            ids.push(obj["id"]);
-        });
-
-        // var headerNames = d3.keys(data[0]);
-        // console.log(headerNames);
-
-        data.map(function(obj){
-            if (ids.indexOf(obj["id"]) > -1){
-                obj["dominant"] = true;
-            }else{
+            data.map(function(obj){
+                if (ids.indexOf(obj["id"]) > -1){
+                    obj["dominant"] = true;
+                }else{
+                    obj["dominant"] = false;
+                }
+            });
+        }else{
+            data.map(function(obj){
                 obj["dominant"] = false;
-            }
-        });
+            });
+            dataSplit.True = [];
+        }
 
-        var headerNames = myKeys.filter(function(key){ return key.indexOf("[in") !== -1 || key.indexOf("[min]") !== -1 || key.indexOf("[max]") !== -1 || key.indexOf("generation") !== -1 || key.indexOf("id") !== -1 });
+        console.log(dataSplit)
+
+        var headerNames = allKeys.filter(function(key){ return key.indexOf("[in]") !== -1 || key.indexOf("[ser") !== -1 || key.indexOf("[seq") !== -1 || key.indexOf("[min]") !== -1 || key.indexOf("[max]") !== -1 || key.indexOf("generation") !== -1 || key.indexOf("id") !== -1 });
 
         var xCat = headerNames[headerNames.length-2],
             yCat = headerNames[headerNames.length-1];
@@ -711,31 +759,32 @@ function runAll(imageTooltip) {
 
             var newItems = sel.enter().append("div");
 
-            newItems
-                .append("svg")
-                .attr('width', img_width)
-                .attr('height', img_height)
-                .append("svg:image")
-                .attr('x',0)
-                .attr('y',0)
-                .attr('width', img_width)
-                .attr('height', img_height)
-                // .attr("xlink:href", function(d){
-                    // return "./images/" + d + ".png";
-                // })
-            ;
+            if (imageTooltip){
+                newItems
+                    .append("svg")
+                    .attr('width', img_width)
+                    .attr('height', img_height)
+                    .append("svg:image")
+                    .attr('x',0)
+                    .attr('y',0)
+                    .attr('width', img_width)
+                    .attr('height', img_height)
+                    // .attr("xlink:href", function(d){
+                        // return "./images/" + d + ".png";
+                    // })
+                ;
+
+                sel.select("image")
+                    .attr("xlink:href", function(d){
+                        return "./images/" + d + ".png";
+                    })
+                ;
+            }
 
             newItems
                 .append("p")
                 .attr("class", "option")
                 // .text(function(d) { return d; })
-            ;
-
-
-            sel.select("image")
-                .attr("xlink:href", function(d){
-                    return "./images/" + d + ".png";
-                })
             ;
 
             sel.select("p")

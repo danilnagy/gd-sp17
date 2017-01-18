@@ -50,10 +50,9 @@ def cleanup(folder):
         except WindowsError:
             continue
 
+# currently unused - visualization print conversion implemented in client-side js
 def printFormat(data, inputsDef):
     formatted = []
-
-    # visualization print conversion implemented in client-side js
 
     # for i, d in enumerate(data):
 
@@ -77,8 +76,13 @@ def create_input(inputsDef):
     elif inputsDef["type"] == "categorical":
         return int(math.floor(random.random() * inputsDef["num"]))
 
-    elif inputsDef["type"] == "sequence":
+    elif inputsDef["type"] == "series":
         return [int(math.floor(random.random() * inputsDef["depth"])) for x in range(inputsDef["length"])]
+
+    elif inputsDef["type"] == "sequence":
+        seq = range(inputsDef["length"])
+        random.shuffle(seq)
+        return seq
 
 def createInputFile(jobDescription):
     paths = getPaths("None")
@@ -97,7 +101,6 @@ def defaultOption(name, defaultValue):
 def parseJobDescription(jobDescription):
 
     # substitute defaults for non-specified options
-
     try:
         jobName = jobDescription["jobName"]
     except KeyError:
@@ -125,7 +128,7 @@ def parseJobDescription(jobDescription):
     # test for input types
     for _i in inputsDef:
         try:
-            if _i["type"] not in ["continuous", "categorical", "sequence"]:
+            if _i["type"] not in ["continuous", "categorical", "series", "sequence"]:
                 print "error:", _i["type"], "input type not supported"
                 return
         except KeyError:
@@ -134,7 +137,6 @@ def parseJobDescription(jobDescription):
 
     # test for output types and parse output format
 
-    # newOutputs = []
     for _o in outputsDef:
         try:
             if _o["type"] not in ["objective", "constraint"]:
@@ -144,8 +146,6 @@ def parseJobDescription(jobDescription):
                 if _o["type"] == "objective":
                     if _o["goal"] not in ["min", "max"]:
                         print "error:", _o["goal"], "is not a supported goal of output type", _o["type"]
-                    # else:
-                        # newOutputs.append(_o)
                 if _o["type"] == "constraint":
                     goal = _o["goal"].split(" ")
                     goal_def = " ".join(goal[:-1])
@@ -212,6 +212,19 @@ def checkAlgoOptions(algo, jobDescription):
         return algoOptions
 
 
+def checkDuplicate(child1, child2):
+    # return False if any inputs different, True if all are same
+    for i, _in in enumerate(child1.get_inputs()):
+        if str(_in) != str(child2.get_inputs()[i]):
+            return False
+    return True
+
+def checkDuplicates(child, children):
+    # return True if any duplicates found, False otherwise
+    for _c in children:
+        if checkDuplicate(child, _c):
+            return True
+    return False
 
 
 def computeDesign(idNum, inputs, jobOptions, paths, meta):
@@ -227,7 +240,12 @@ def computeDesign(idNum, inputs, jobOptions, paths, meta):
 
     if os.path.isfile(paths["output"]):
         with open(paths["output"], 'r') as f:
-            outputs = [float(x.strip()) for x in f.readlines()]
+            try:
+                outputs = [float(x.strip()) for x in f.readlines()]
+            # catch issues with outputs and set outputs as None (will be ignored in ranking)
+            except ValueError:
+                outputs = None
+
 
         waiting = True
         while waiting:

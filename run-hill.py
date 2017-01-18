@@ -1,13 +1,25 @@
-from job import run
+from src import job
 
-run(jobName = "hill",
-	inputs = [
-		["x", [0,10] ], 
-		["y", [0,10] ]
+jobDescription = {
+	"jobName": "hill",
+	"inputsDef": [
+		{ "name": "x", "type": "continuous", "range": [0,10]},
+		{ "name": "y", "type": "continuous", "range": [0,10]},
 		],
-	outputs = [
-		["height", "max"]
+	"outputsDef": [
+		{ "name": "height", "type": "objective", "goal": "max"},
 		],
-	numGenerations = 5,
-	numPopulation = 5,
-	algo = "GA")
+	"algo": "GA",
+	"algoOptions": {
+		"numGenerations": 15,
+		"numPopulation": 5,
+		"mutationRate": 0.25,
+		"saveElites": 1
+		},
+	"jobOptions": {
+		"screenshots": True
+		}
+	}
+
+# job.createInputFile(jobDescription)
+job.run(jobDescription)

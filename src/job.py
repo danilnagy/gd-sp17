@@ -41,8 +41,10 @@ def runGA(inputsDef, outputsDef, algoOptions, jobOptions, paths, meta):
 		header.append("feasible")
 
 	for _i in inputsDef:
-		if _i["type"] == "sequence":
-			header.append("[in " + str(_i["depth"]) + "] " + _i["name"])
+		if _i["type"] == "series":
+			header.append("[ser " + str(_i["depth"]) + "] " + _i["name"])
+		elif _i["type"] == "sequence":
+			header.append("[seq " + str(_i["length"]) + "] " + _i["name"])
 		else:
 			header.append("[in] " + _i["name"])
 	for _o in outputsDef:
@@ -66,6 +68,8 @@ def runGA(inputsDef, outputsDef, algoOptions, jobOptions, paths, meta):
 		population.append(Design(0, i, idNum))
 		idNum += 1
 
+	print "Setting initial population..."
+
 	# set random inputs for first generation
 	for des in population:
 		newInputs = []
@@ -74,6 +78,8 @@ def runGA(inputsDef, outputsDef, algoOptions, jobOptions, paths, meta):
 		des.set_inputs(newInputs)
 
 	for g in range(numGenerations):
+
+		print "Computing designs for generation", str(g), "..."
 
 		# for each design, calculate output metrics
 		for des in population:
@@ -93,20 +99,21 @@ def runGA(inputsDef, outputsDef, algoOptions, jobOptions, paths, meta):
 				f.write("\n" + "\t".join([str(x) for x in (d + printFormat(des.get_inputs(), inputsDef) + outputs)]))
 
 		# compute ranking for population (higher value is better performance)
-		ranking = rank(population, outputsDef, g, numGenerations, usingConstraints)
+		ranking, crowding, penalties = rank(population, outputsDef, g, numGenerations, usingConstraints)
 		print "Generation ranking:", ranking
+		if len(outputsDef) > 1:
+			print "Generation crowding:", [float("%.2f" % distance) for distance in crowding]
 
-		# add designs to mating pool based on ranking
-		matingPool = []
-		for i, order in enumerate(ranking):
-			for j in range(order):
-				matingPool.append(population[i])
-
+		# create new empty list of children
 		children = []
 
+		# combine all criteria in order of importance
+		stats = [ [penalties[i], ranking[i], crowding[i]] for i in range(len(ranking))]
+
+		# carry over elite to next generation
 		if saveElites > 0:
-			# get elites
-			elites = [i[0] for i in sorted(enumerate(ranking), key=lambda x:x[1])][-saveElites:]
+			# get elites from sorted list of ranking and crowding
+			elites = [i[0] for i in sorted(enumerate(stats), key=lambda x: (x[1][0], -x[1][1], -x[1][2]))][:saveElites]
 			print "elite(s):", elites
 
 			# add elites to next generation
@@ -116,15 +123,64 @@ def runGA(inputsDef, outputsDef, algoOptions, jobOptions, paths, meta):
 				children.append(child)
 				idNum += 1
 
-		for i in range(len(population)-saveElites):				
-			parentA = matingPool[random.choice(range(len(matingPool)))]
-			parentB = matingPool[random.choice(range(len(matingPool)))]
+		# MATING POOL SELECTOR (NOT CURRENTLY IN USE)
+		# add designs to mating pool based on ranking
+		# matingPool = []
+		# for i, order in enumerate(ranking):
+		# 	for j in range(order):
+		# 		matingPool.append(population[i])
 
-			child = parentA.crossover(parentB, inputsDef, g+1, saveElites+i, idNum)
+		# for i in range(len(population) - saveElites):				
+		# 	parentA = matingPool[random.choice(range(len(matingPool)))]
+		# 	parentB = matingPool[random.choice(range(len(matingPool)))]
+
+		# 	child = parentA.crossover(parentB, inputsDef, g+1, saveElites+i, idNum)
+		# 	child.mutate(inputsDef, mutationRate)
+		# 	children.append(child)
+		# 	idNum += 1
+
+		# TOURNAMENT SELECTOR
+		# for each new child...
+
+		childNum = saveElites
+		while childNum < len(population):
+		# for i in range(len(population) - saveElites):
+			# choose two parents through two binary tournaments
+			pool = range(len(population))
+			parents = []
+			for j in range(2):
+				# select one candidate from pool
+				candidate1 = random.choice(pool)
+				# take first candidate out of pool
+				pool.pop(pool.index(candidate1))
+				# select another candidate from remaining pool
+				candidate2 = random.choice(pool)
+				# take second candidate out of pool
+				pool.pop(pool.index(candidate2))
+
+				candidates = [[x, stats[x]] for x in [candidate1, candidate2]]
+				standings = sorted( candidates, key=lambda x: (x[1][0], -x[1][1], -x[1][2]) )
+
+				print "tournament:", candidate1, "/", candidate2, "->", standings[0][0]
+
+				# add winner to parent set
+				parents.append(standings[0][0])
+				# add loser back to pool
+				pool.append(standings[1][0])
+
+			print "breeding:", parents, "->", childNum
+
+			child = population[parents[0]].crossover(population[parents[1]], inputsDef, g+1, childNum, idNum)
 			child.mutate(inputsDef, mutationRate)
-			children.append(child)
-			idNum += 1
 
+			if not checkDuplicates(child, children):
+				children.append(child)
+				idNum += 1
+				childNum += 1
+			else:
+				print "duplicate child, skipping..."
+
+		# set children list as next population
 		population = children
 
 

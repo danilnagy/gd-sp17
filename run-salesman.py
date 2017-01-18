@@ -1,19 +1,19 @@
 from src import job
 
 jobDescription = {
-	"jobName": "grid",
+	"jobName": "salesman",
 	"inputsDef": [
-		{ "name": "code", "type": "series", "length": 25, "depth": 3, "mutationRate": 0.5}
+		{ "name": "city order", "type": "sequence", "length": 10, "mutationRate": 0.30}
 		],
 	"outputsDef": [
-		{ "name": "target", "type": "objective", "goal": "min"}
+		{ "name": "distance traveled", "type": "objective", "goal": "min"}
 		],
 	"algo": "GA",
 	"algoOptions": {
 		"numGenerations": 5,
 		"numPopulation": 5,
-		"mutationRate": 0.05,
-		"saveElites": 1
+		"mutationRate": 0.2,
+		"saveElites": 0
 		},
 	"jobOptions": {
 		"screenshots": True
